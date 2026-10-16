@@ -1,8 +1,7 @@
 name: Publish portfolio
 on:
   push:
-    paths:
-      - '.github/workflows/publish.yml'
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,26 +18,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Copy the approved portfolio
+      - name: Assemble approved portfolio
+        if: hashFiles('.github/migration/part-*') != ''
         run: |
-          python3 - <<'PYTHON'
-          import json, pathlib, urllib.request
-          origin = 'https://neeral-design-portfolio.nwadhwani.chatgpt.site/'
-          for name in json.loads(pathlib.Path('.github/site-files.json').read_text()):
-              dest = pathlib.Path(name)
-              if name == '.nojekyll':
-                  dest.touch()
-                  continue
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              with urllib.request.urlopen(origin + name) as response:
-                  dest.write_bytes(response.read())
-          PYTHON
-      - name: Save portfolio files
-        run: |
+          cat .github/migration/part-* > /tmp/portfolio.tar.gz
+          echo '84e027013f0af58d45231e50ec42f63fa83525063bfd456562e1c4e9bd319f95  /tmp/portfolio.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/portfolio.tar.gz
+          rm -r .github/migration
+          rm .github/site-files.json
+          touch .nojekyll
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .
-          git diff --cached --quiet || git commit -m 'Add approved portfolio and final resume'
+          git commit -m 'Save complete portfolio with recordings and final resume'
           git push
       - uses: actions/configure-pages@v5
         with:
